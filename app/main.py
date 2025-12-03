@@ -3,10 +3,9 @@ import time
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from decrypt_seed import load_private_key, decrypt_seed
-from totp_utils import generate_totp_code, verify_totp_code
+from app.crypto_utils import decrypt_seed
+from app.totp_utils import generate_totp_code
 
-app = FastAPI()
 
 DATA_DIR = "/data"
 SEED_FILE = f"{DATA_DIR}/seed.txt"

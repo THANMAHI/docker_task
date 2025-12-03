@@ -30,5 +30,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  seed-data:
-  cron-output:
+  - seed-data:/app/app/data
+  - cron-output:/app/app/cron

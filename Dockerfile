@@ -5,14 +5,16 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
+# Install pip (python3 already included in python slim)
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip && \
+    apt-get install -y python3-pip && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Copy dependency file
 COPY requirements.txt .
 
-# Install dependencies to default python location
+# Install dependencies into /usr/local
 RUN pip install -r requirements.txt
 
 
@@ -24,30 +26,31 @@ FROM python:3.11-slim
 ENV TZ=UTC
 WORKDIR /app
 
+# Install cron + timezone
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip cron tzdata procps && \
-    ln -sf /usr/bin/python3 /usr/bin/python && \
+    apt-get install -y cron tzdata && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set timezone
-RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
+# Set UTC timezone
+RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
+    echo "UTC" > /etc/timezone
 
-# Copy Python packages & binaries
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+# Copy installed python packages & binaries from builder
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application files
-COPY app.py .
-COPY decrypt_seed.py .
-COPY totp_utils.py .
-COPY student_private.pem .
-COPY student_public.pem .
-COPY instructor_public.pem .
+# Copy application package (your FastAPI code)
+COPY app/ /app/
 
-COPY scripts/ ./scripts/
-COPY cron/ ./cron/
+# Copy supporting scripts
+COPY scripts/ /scripts/
 
-# Install cron job
+# Copy RSA keys
+COPY student_private.pem /app/student_private.pem
+COPY student_public.pem /app/student_public.pem
+COPY instructor_public.pem /app/instructor_public.pem
+
+# Setup cron job (IMPORTANT: correct path)
 RUN chmod 644 /app/cron/2fa-cron && crontab /app/cron/2fa-cron
 
 # Create persistent volumes
@@ -57,4 +60,5 @@ VOLUME ["/data", "/cron"]
 
 EXPOSE 8080
 
-CMD service cron start && uvicorn app:app --host 0.0.0.0 --port 8080
+# Start cron + FastAPI server
+CMD service cron start && uvicorn app.main:app --host 0.0.0.0 --port 8080

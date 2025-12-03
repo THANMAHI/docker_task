@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import os
 import datetime
-from totp_utils import generate_totp_code
+from app.totp_utils import generate_totp_code
+
 
 SEED_PATH = "/data/seed.txt"
 
