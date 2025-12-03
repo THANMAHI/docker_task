@@ -1,0 +1,21 @@
+# ----------------------------------
+# REQUIRED EXCLUSIONS
+# ----------------------------------
+
+# Do NOT commit encrypted seed
+encrypted_seed.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
+
+# Byte-compiled logs or misc
+*.log
+*.tmp
