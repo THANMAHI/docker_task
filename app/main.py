@@ -1,107 +1,54 @@
-import os
-import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
+import os
 
-from app.crypto_utils import decrypt_seed
-from app.totp_utils import generate_totp_code
+from app.crypto_utils import decrypt_seed, load_private_key
+from app.totp_utils import generate_totp, verify_totp
 
+app = FastAPI()
 
-DATA_DIR = "/data"
-SEED_FILE = f"{DATA_DIR}/seed.txt"
-
-
-# ------------------------------
-# Request Models
-# ------------------------------
-
-class EncryptedSeedRequest(BaseModel):
+class SeedRequest(BaseModel):
     encrypted_seed: str
 
-
-class VerifyCodeRequest(BaseModel):
+class TOTPVerifyRequest(BaseModel):
     code: str
 
-
-# ------------------------------
-# Helpers
-# ------------------------------
-
-def read_seed():
-    if not os.path.exists(SEED_FILE):
-        return None
-    with open(SEED_FILE, "r") as f:
-        return f.read().strip()
-
-
-def save_seed(seed_hex: str):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(SEED_FILE, "w") as f:
-        f.write(seed_hex)
-
-
-# ------------------------------
-# Endpoint 1: POST /decrypt-seed
-# ------------------------------
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 @app.post("/decrypt-seed")
-def decrypt_seed_endpoint(body: EncryptedSeedRequest):
-    encrypted_seed = body.encrypted_seed
-
+def decrypt_seed_endpoint(req: SeedRequest):
     try:
-        private_key = load_private_key()
-        seed_hex = decrypt_seed(encrypted_seed, private_key)
-        save_seed(seed_hex)
-        return {"status": "ok"}
+        private_key = load_private_key()   # ← LOAD KEY HERE
+        seed = decrypt_seed(req.encrypted_seed, private_key)
 
-    except Exception:
-        raise HTTPException(status_code=500, detail="Decryption failed")
+        os.makedirs("/data", exist_ok=True)
+        with open("/data/seed.txt", "w") as f:
+            f.write(seed)
 
-
-# ------------------------------
-# Endpoint 2: GET /generate-2fa
-# ------------------------------
+        return {"status": "success", "seed": seed}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/generate-2fa")
 def generate_2fa():
-    seed_hex = read_seed()
+    try:
+        with open("/data/seed.txt", "r") as f:
+            seed = f.read().strip()
 
-    if seed_hex is None:
-        raise HTTPException(status_code=500, detail="Seed not decrypted yet")
-
-    # Generate TOTP code
-    code = generate_totp_code(seed_hex)
-
-    # Calculate seconds remaining in current TOTP period (0–29)
-    current_time = int(time.time())
-    valid_for = 30 - (current_time % 30)
-
-    return {"code": code, "valid_for": valid_for}
-
-
-# ------------------------------
-# Endpoint 3: POST /verify-2fa
-# ------------------------------
+        code = generate_totp(seed)
+        return {"code": code}
+    except:
+        return {"error": "Seed not found"}
 
 @app.post("/verify-2fa")
-def verify_2fa(body: VerifyCodeRequest):
-    if not body.code:
-        raise HTTPException(status_code=400, detail="Missing code")
+def verify_2fa(req: TOTPVerifyRequest):
+    try:
+        with open("/data/seed.txt", "r") as f:
+            seed = f.read().strip()
 
-    seed_hex = read_seed()
-    if seed_hex is None:
-        raise HTTPException(status_code=500, detail="Seed not decrypted yet")
-
-    # Verify with ±1 time window
-    is_valid = verify_totp_code(seed_hex, body.code)
-
-    return {"valid": is_valid}
-
-
-# ------------------------------
-# Optional: Basic health check
-# ------------------------------
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+        valid = verify_totp(seed, req.code)
+        return {"valid": valid}
+    except:
+        return {"error": "Seed not found"}

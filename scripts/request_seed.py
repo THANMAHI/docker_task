@@ -6,7 +6,7 @@ def request_seed(student_id: str, github_repo_url: str, api_url: str):
     Request encrypted seed from instructor API
     """
     # 1. Read student public key from PEM file
-    with open("student_public.pem", "r") as f:
+    with open("/app/student_public.pem", "r") as f:
         public_key_pem = f.read()
 
     # 2. Prepare JSON payload

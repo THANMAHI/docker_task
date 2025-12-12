@@ -42,4 +42,4 @@ EXPOSE 8080
 
 # Start cron and the API server
 # Use sh -c to run both in foreground-ish manner: cron in background, uvicorn foreground
-CMD service cron start && uvicorn app:app --host 0.0.0.0 --port 8080
+CMD service cron start && uvicorn app.main:app --host 0.0.0.0 --port 8080
