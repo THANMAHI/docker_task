@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 import os
-import datetime
-from app.totp_utils import generate_totp_code
+from datetime import datetime, timezone
+from totp_utils import generate_totp
 
-
-SEED_PATH = "/data/seed.txt"
-
-def read_seed():
-    if not os.path.exists(SEED_PATH):
-        print("Seed file not found")
-        return None
-    with open(SEED_PATH, "r") as f:
-        return f.read().strip()
+DATA_PATH = "/data/seed.txt"
+LOG_PATH = "/cron/last_code.txt"
 
 def main():
-    seed = read_seed()
-    if not seed:
-        print("No seed available")
-        return
+    try:
+        if not os.path.exists(DATA_PATH):
+            print("No seed yet, skipping", flush=True)
+            return
 
-    # Generate TOTP code
-    code = generate_totp_code(seed)
+        with open(DATA_PATH, "r") as f:
+            hex_seed = f.read().strip()
 
-    # UTC timestamp
-    now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        code = generate_totp(hex_seed)
+        now = datetime.now(timezone.utc)
+        ts = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Output format
-    print(f"{now} - 2FA Code: {code}")
+        # Append the line
+        with open(LOG_PATH, "a") as logf:
+            logf.write(f"{ts} - 2FA Code: {code}\n")
+
+    except Exception as e:
+        # Cron captures stdout/stderr; write a short message to stderr to help debugging.
+        print(f"Error in cron job: {e}", flush=True)
 
 if __name__ == "__main__":
     main()

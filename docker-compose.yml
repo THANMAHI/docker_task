@@ -1,34 +1,21 @@
+version: "3.8"
 services:
   app:
-    container_name: pki_2fa_app
-
-    # Build the image from the current directory
     build:
       context: .
       dockerfile: Dockerfile
-
-    # Expose API port
+    container_name: pki-totp-app
     ports:
       - "8080:8080"
-
-    # Volume mounts
-    volumes:
-      # Named volumes → persist seed + cron logs
-      - seed-data:/data
-      - cron-output:/cron
-
-      # Mount key files (readonly)
-      - ./student_private.pem:/app/student_private.pem:ro
-      - ./student_public.pem:/app/student_public.pem:ro
-      - ./instructor_public.pem:/app/instructor_public.pem:ro
-
-    # Environment variables
     environment:
       - TZ=UTC
-
-    # Restart policy
+      - DATA_DIR=/data
+      - STUDENT_PRIVATE_KEY=/app/student_private.pem
+    volumes:
+      - seed-data:/data
+      - cron-output:/cron
     restart: unless-stopped
 
 volumes:
-  - seed-data:/app/app/data
-  - cron-output:/app/app/cron
+  seed-data:
+  cron-output:

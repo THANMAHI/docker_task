@@ -1,2 +1,3 @@
-app/cron/2fa-cron text eol=lf
+cron/2fa-cron text eol=lf
+scripts/*.py text eol=lf
 *.py text eol=lf

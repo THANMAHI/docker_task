@@ -1,43 +1,33 @@
+# totp_utils.py
 import base64
-import pyotp
+import time
+import hmac
+import hashlib
+import struct
 
 def hex_to_base32(hex_seed: str) -> str:
-    """
-    Convert 64-char hex seed to Base32 encoding.
-    Required for TOTP libraries.
-    """
     seed_bytes = bytes.fromhex(hex_seed)
     base32_seed = base64.b32encode(seed_bytes).decode("utf-8")
     return base32_seed
 
+def _hotp(key: bytes, counter: int, digits: int = 6) -> str:
+    msg = struct.pack(">Q", counter)
+    h = hmac.new(key, msg, hashlib.sha1).digest()
+    o = h[-1] & 0x0F
+    code = (struct.unpack(">I", h[o:o+4])[0] & 0x7FFFFFFF) % (10 ** digits)
+    return str(code).zfill(digits)
 
-def generate_totp_code(hex_seed: str) -> str:
-    """
-    Generate current TOTP code from a 64-character hex seed.
-    SHA-1, 30 sec, 6 digits (default settings)
-    """
-    # 1. Convert hex -> bytes -> base32
+def generate_totp(hex_seed: str, digits: int = 6, period: int = 30) -> str:
     base32_seed = hex_to_base32(hex_seed)
+    key = base64.b32decode(base32_seed)
+    timestep = int(time.time()) // period
+    return _hotp(key, timestep, digits)
 
-    # 2. Create TOTP object with default settings
-    totp = pyotp.TOTP(base32_seed)  # SHA-1, 30s, 6 digits (default)
-
-    # 3. Generate current TOTP code
-    code = totp.now()
-
-    # 4. Return 6-digit code
-    return code
-
-
-def verify_totp_code(hex_seed: str, code: str, valid_window: int = 1) -> bool:
-    """
-    Verify TOTP code with ±1 period window tolerance.
-    """
-    # 1. Convert hex -> base32
+def verify_totp(hex_seed: str, code: str, window: int = 1, digits: int = 6, period: int = 30) -> bool:
     base32_seed = hex_to_base32(hex_seed)
-
-    # 2. Create TOTP object
-    totp = pyotp.TOTP(base32_seed)
-
-    # 3. Verify with ±1 window (±30 seconds)
-    return totp.verify(code, valid_window=valid_window)
+    key = base64.b32decode(base32_seed)
+    current_step = int(time.time()) // period
+    for offset in range(-window, window + 1):
+        if _hotp(key, current_step + offset, digits) == code:
+            return True
+    return False
